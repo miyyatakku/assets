@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<meta name="description" content="固定資産の場所変更">
+<meta name="keyword" content="キーワード1,キーワード2,キーワード3">
+
+
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.min.js"></script>
+  <script type="text/javascript" src="js/megapix-image.js"></script>
+
+  <script type="text/javascript" src="js/grid.js"></script>
+  <script type="text/javascript" src="js/version.js"></script>
+  <script type="text/javascript" src="js/detector.js"></script>
+  <script type="text/javascript" src="js/formatinf.js"></script>
+  <script type="text/javascript" src="js/errorlevel.js"></script>
+  <script type="text/javascript" src="js/bitmat.js"></script>
+  <script type="text/javascript" src="js/datablock.js"></script>
+  <script type="text/javascript" src="js/bmparser.js"></script>
+  <script type="text/javascript" src="js/datamask.js"></script>
+  <script type="text/javascript" src="js/rsdecoder.js"></script>
+  <script type="text/javascript" src="js/gf256poly.js"></script>
+  <script type="text/javascript" src="js/gf256.js"></script>
+  <script type="text/javascript" src="js/decoder.js"></script>
+  <script type="text/javascript" src="js/qrcode.js"></script>
+  <script type="text/javascript" src="js/findpat.js"></script>
+  <script type="text/javascript" src="js/alignpat.js"></script>
+  <script type="text/javascript" src="js/databr.js"></script>
+<script>
+function test(){
+  var canvas = document.getElementById('qr-canvas');
+  var img = new Image();
+  img.src = "../chart.png";
+  img.onload = function() {
+    var resizedWidth = 30;
+    var resizedHeight = 30;
+    canvas.style.width = resizedWidth;
+    canvas.style.height = resizedHeight;
+    canvas.width = resizedWidth;
+    canvas.height = resizedHeight;
+    canvas.getContext("2d").drawImage(img, 0, 0, img.width, img.height, 0, 0, resizedWidth, resizedHeight);
+  };
+}
+$(document).ready(function() {
+  var info = $('#info');
+  var result = $('#result');
+  qrcode.callback = function(res) {
+    if (res == 'error decoding QR Code') {
+      result.text('QRコードの解析に失敗');
+    } else {
+      var data = location.href.split("?")[1];
+      var place = JSON.parse(res);
+      if(place.type == "place"){
+  		  $.ajax({
+              type: "POST",
+              url: "put_place.php",
+              data:{assetsid:data, placeid:place.id},
+              success: function(){
+                alert('固定資産の場所変更処理が完了しました。');
+              }
+        });
+      }else{
+        alert("Error: 場所QRを読み込んでください。");
+      }
+    }
+  };
+  function binarization(canvas, blackBorder) {
+    var ctx = canvas.getContext("2d");
+    var src = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var dst = ctx.createImageData(canvas.width, canvas.height);    
+    for (var i = 0; i < src.data.length; i += 4) {
+      var v = src.data[i] + src.data[i+1] + src.data[i+2];
+      var c;
+      if (v <= blackBorder * 3) {
+        c = 0;
+      } else {
+        c = 255;
+      }
+      dst.data[i] = c;
+      dst.data[i+1] = c;
+      dst.data[i+2] = c;
+      dst.data[i+3] = src.data[i+3];
+    }
+    ctx.putImageData(dst, 0, 0);
+  }
+  function isURL(str) {
+    if (str.match(/https?/)) {
+      return true;
+    }
+    return false;
+  }
+  function loadImage(fileID) {
+    var fileList = document.getElementById(fileID).files;
+    var reader = new FileReader();
+    file = fileList[0];
+    if (file.type == 'image/jpeg' ||
+      file.type == 'image/png'){
+      reader.readAsDataURL(file, "utf-8");
+      info.text('ファイル名 ' + file.name + ' を読み込み中');
+      reader.onload = (function(theFile) {
+        return function(e) {
+        info.text('ファイル名 ' + file.name + ' のQRコードを解析中');
+        var data = e.target.result;
+        var img = new Image();
+        img.src = data;
+        img.onload = function() {
+          var canvas = document.getElementById('qr-canvas');
+          var limitSize = 2000;
+          var resizedWidth = img.width;
+          var resizedHeight = img.height;
+          if (resizedWidth > limitSize || resizedHeight > limitSize) {
+            var s;
+            if (resizedWidth > resizedHeight) {
+              s = limitSize / resizedWidth;
+            } else {
+              s = limitSize / resizedHeight;
+            }
+            resizedWidth *= s;
+            resizedHeight *= s;
+          }
+          canvas.width = limitSize;
+          canvas.height = limitSize;
+          if (canvas.style.width > canvas.style.height) {
+            canvas.style.width = resizedWidth;
+            canvas.style.height = resizedHeight;
+          } else {
+            canvas.style.width = resizedWidth;
+            canvas.style.height = resizedHeight;
+          }
+          var mpImg = new MegaPixImage(img);
+          mpImg.render(canvas, { width: canvas.width, height: canvas.height });
+          binarization(canvas, 110);
+          var resized_data = canvas.toDataURL("image/png");
+          qrcode.decode(resized_data);
+          //info.text('【場所情報】');
+          info.html('\
+          	【場所情報】<br>\
+          	  <br>\
+          	')
+          };
+        };
+      })(file);
+    } else {
+      alert('JPEGかPNGファイルをアップして下さい');
+    }
+  }
+  $('#file').change(function(e) {
+    loadImage('file');
+  });
+});
+
+</script>
+
+<title>固定資産の場所変更</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+<!-- ヘッダここから -->
+<header>
+<h1>カイゼンマインド研修2017　チームMMA　PoC</h1>
+<div id="box_t">
+<h2 id="top">固定資産管理の場所変更</h2>
+</div>
+</header>
+<!-- /ヘッダここまで -->
+
+<div id="contents">
+  <form>
+下のボタンから移設先の場所QRコードの画像の選択、もしくはカメラ撮影を行って下さい。<br>
+【移設先の場所QRコード】<br>
+    <input type="file" id="file" ><br>
+  </form>
+  <p id="result_block"><br>
+  <p id="result"></p>
+  <br><br>
+  <p id="info" hidden></p>
+  </p>
+  <canvas id="qr-canvas" hidden></canvas>
+  
+  <p id="place"></p>
+
+
+<p id="homebtn"><a href="index.html"><img src="img/home.png" width="18" height="13" alt="">ホームへ戻る</a></p>
+
+<!-- フッタここから -->
+<footer>
+<div id="footer">
+<p>Copyright&copy; <a href="本人のサイトURL">サイト名</a>, All rights reserved.<br>
+<!-- ***削除禁止*** -->
+Designed by <a href="http://www.bannerbridge.net/">バナーブリッジ</a>
+<!-- ***削除禁止*** -->
+</p>
+</div>
+</footer>
+<!-- /フッタここまで -->
+
+</body>
+</html>
